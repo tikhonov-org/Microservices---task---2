@@ -27,7 +27,7 @@ import java.util.Set;
 public class AuthController {
 
     private final UserValidator userValidator;
-    private final RegistrationService registrationService;;
+    private final RegistrationService registrationService;
     private final RoleService roleService;
 
     @Autowired

@@ -37,7 +37,7 @@ public class User {
     @NotEmpty(message = "Enter password")
     private String password;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany
     @NotEmpty(message = "Select role")
     @JoinTable(
             name = "user_roles",
