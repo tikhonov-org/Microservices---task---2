@@ -8,7 +8,6 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import ru.itmentor.spring.boot_security.demo.auth.UserDetailsImpl;
 import ru.itmentor.spring.boot_security.demo.model.User;
-import ru.itmentor.spring.boot_security.demo.service.RegistrationService;
 import ru.itmentor.spring.boot_security.demo.service.RoleService;
 import ru.itmentor.spring.boot_security.demo.service.UserService;
 import ru.itmentor.spring.boot_security.demo.util.UserValidator;
@@ -21,14 +20,12 @@ public class AdminController {
 
     private final UserService userService;
     private final RoleService roleService;
-    private final RegistrationService registrationService;
     private final UserValidator userValidator;
 
     @Autowired
-    public AdminController(UserService userService, RoleService roleService, RegistrationService registrationService, UserValidator userValidator) {
+    public AdminController(UserService userService, RoleService roleService, UserValidator userValidator) {
         this.userService = userService;
         this.roleService = roleService;
-        this.registrationService = registrationService;
         this.userValidator = userValidator;
     }
 
@@ -63,12 +60,11 @@ public class AdminController {
     @PostMapping
     public String addUser(@ModelAttribute("user") @Valid User user, BindingResult bindingResult, Model model) {
         userValidator.validate(user, bindingResult);
-        bindingResult.getAllErrors().forEach(error -> System.out.println(error.getDefaultMessage()));
         if (bindingResult.hasErrors()) {
             model.addAttribute("roles", roleService.getRoles());
             return "admin/new";
         }
-        registrationService.registerUser(user);
+        userService.addUser(user);
         return "redirect:/admin";
     }
 
