@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Denied</title>
+</head>
+<body style="margin: 25px 50px 25px 50px">
+    <p>You have no access to this page</p>
+    <a th:if="${id}" th:href="@{/user/{id}(id=${id})}">Back to profile</a>
+    <a th:unless="${id}" th:href="@{/}">Back to home</a>
+</body>
+</html>
