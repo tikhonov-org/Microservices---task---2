@@ -1,99 +1,92 @@
 package ru.itmentor.spring.boot_security.demo.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import ru.itmentor.spring.boot_security.demo.auth.UserDetailsImpl;
+import ru.itmentor.spring.boot_security.demo.dto.UserRequestDto;
+import ru.itmentor.spring.boot_security.demo.dto.UserResponseDto;
+import ru.itmentor.spring.boot_security.demo.exceptions.CreateUserException;
+import ru.itmentor.spring.boot_security.demo.exceptions.RoleNotFoundException;
+import ru.itmentor.spring.boot_security.demo.exceptions.UserAPIErrorsResponse;
+import ru.itmentor.spring.boot_security.demo.exceptions.UserNotFoundException;
 import ru.itmentor.spring.boot_security.demo.model.User;
 import ru.itmentor.spring.boot_security.demo.service.RoleService;
 import ru.itmentor.spring.boot_security.demo.service.UserService;
+import ru.itmentor.spring.boot_security.demo.util.UserDtoConverter;
 import ru.itmentor.spring.boot_security.demo.util.UserValidator;
 import javax.validation.Valid;
 import java.util.List;
+import java.util.stream.Collectors;
 
-@Controller
+@RestController
 @RequestMapping("/admin")
 public class AdminController {
 
     private final UserService userService;
-    private final RoleService roleService;
     private final UserValidator userValidator;
+    private final UserDtoConverter userDtoConverter;
 
     @Autowired
-    public AdminController(UserService userService, RoleService roleService, UserValidator userValidator) {
+    public AdminController(UserService userService, UserValidator userValidator, UserDtoConverter userDtoConverter) {
         this.userService = userService;
-        this.roleService = roleService;
         this.userValidator = userValidator;
+        this.userDtoConverter = userDtoConverter;
     }
 
     @GetMapping()
-    public String getUsers(Authentication authentication, Model model) {
-        model.addAttribute("users", userService.getUsers());
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        model.addAttribute("curUserId", userDetails.getUser().getId());
-        return "admin/users";
+    public List<UserResponseDto> getUsers() {
+        return userService.getUsers().stream()
+                .map(userDtoConverter::toDto)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public String getUser(@PathVariable int id, Authentication authentication, Model model) {
-        model.addAttribute("user", userService.getUser(id));
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        model.addAttribute("isCurUser", userDetails.getUser().getId() == id);
-        return "admin/user";
+    public UserResponseDto getUser(@PathVariable("id") int id) {
+        return userDtoConverter.toDto(userService.getUser(id));
     }
 
     @DeleteMapping("/{id}")
-    public String deleteUser(@PathVariable int id) {
+    public ResponseEntity<HttpStatus> deleteUser(@PathVariable("id") int id) {
         userService.deleteUser(id);
-        return "redirect:/admin";
+        return ResponseEntity.ok(HttpStatus.OK);
     }
 
-    @GetMapping("/new")
-    public String newUserForm(@ModelAttribute("user") User user, Model model) {
-        model.addAttribute("roles", roleService.getRoles());
-        return "admin/new";
-    }
-
-    @PostMapping
-    public String addUser(@ModelAttribute("user") @Valid User user, BindingResult bindingResult, Model model) {
-        userValidator.validate(user, bindingResult);
+    @PostMapping()
+    public ResponseEntity<HttpStatus> createUser(@RequestBody @Valid UserRequestDto userRequestDto, BindingResult bindingResult) {
+        User newUser = userDtoConverter.fromDto(userRequestDto);
+        userValidator.validate(newUser, bindingResult);
         if (bindingResult.hasErrors()) {
-            model.addAttribute("roles", roleService.getRoles());
-            return "admin/new";
+            StringBuilder errorMsg = new StringBuilder();
+            bindingResult.getFieldErrors().forEach(error ->
+                    errorMsg.append(error.getField())
+                            .append(": ")
+                            .append(error.getDefaultMessage())
+                            .append("\n"));
+            throw new CreateUserException(errorMsg.toString());
         }
-        userService.addUser(user);
-        return "redirect:/admin";
-    }
-
-    @GetMapping("/{id}/edit")
-    public String editUserForm(@PathVariable int id, Authentication authentication, Model model) {
-        model.addAttribute("user", userService.getUser(id));
-        model.addAttribute("roles", roleService.getRoles());
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        model.addAttribute("isCurUser", userDetails.getUser().getId() == id);
-        return "admin/edit";
+        userService.addUser(newUser);
+        return ResponseEntity.ok(HttpStatus.OK);
     }
 
     @PatchMapping("/{id}")
-    public String updateUser(@ModelAttribute("user") @Valid User user, BindingResult bindingResult, @PathVariable("id") int id, Authentication authentication, Model model) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        boolean isCurUser = userDetails.getUser().getId() == id;
-        List<String> uncheckFields = isCurUser
-                ? List.of("login", "password", "roles")
-                : List.of("login", "password");
-
-        boolean hasErrors = bindingResult.getFieldErrors().stream()
-                .anyMatch(error -> !uncheckFields.contains(error.getField()));
-
-        if (hasErrors) {
-            model.addAttribute("roles", roleService.getRoles());
-            return "admin/edit";
+    public ResponseEntity<HttpStatus> updateUser(@PathVariable("id") int id, @RequestBody @Valid UserRequestDto userRequestDto, BindingResult bindingResult) {
+        User updatedUser = userDtoConverter.fromDto(userRequestDto);
+        if (bindingResult.hasErrors()) {
+            StringBuilder errorMsg = new StringBuilder();
+            bindingResult.getFieldErrors().forEach(error ->
+                    errorMsg.append(error.getField())
+                            .append(": ")
+                            .append(error.getDefaultMessage())
+                            .append("\n"));
+            throw new CreateUserException(errorMsg.toString());
         }
-
-        userService.updateUser(id, user);
-        return "redirect:/admin";
+        userService.updateUser(id, updatedUser);
+        return ResponseEntity.ok(HttpStatus.OK);
     }
 }
